@@ -1,3 +1,10 @@
 streamlit
 streamlit-option-menu
 matplotlib
+fastapi
+motor
+pandas
+uvicorn
+pymongo
+bson
+python-multipart

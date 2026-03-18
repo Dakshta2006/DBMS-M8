@@ -2,13 +2,12 @@
 import streamlit as st
 from components.sidebar import sidebar
 from components.charts import patient_line_chart, appointment_donut_chart
-
-# All categories and their modules
+from modules.module_B8.patient_view import render_patient_module# All categories and their modules
 CATEGORIES = {
     "A - Patient Clinical Data": {
         "title": "Patient Clinical Data Management",
         "description": "Manage patient records, medical history, diagnoses, and treatment plans",
-        "icon": "🏥",
+        "icon": "🏥",         
         "stats": {"total": "153,600", "alerts": "12", "modules": "6"},
         "modules": [
             ("A1", "Patient Demographics & Visit History Database", "Patient demographics and admission data", 5, 12500),
@@ -130,9 +129,14 @@ CATEGORIES = {
 }
 
 def patient_dashboard():
-    st.session_state.setdefault("view", "main")
-    st.session_state.setdefault("selected_category", None)
-    st.session_state.setdefault("selected_module", None)
+    if "view" not in st.session_state:
+        st.session_state.view = "main"
+    if "selected_category" not in st.session_state:
+        st.session_state.selected_category = None
+    if "selected_module" not in st.session_state:
+        st.session_state.selected_module = None
+    if "last_sidebar" not in st.session_state:
+        st.session_state.last_sidebar = None
 
     # Sidebar
     selected = sidebar([
@@ -149,14 +153,16 @@ def patient_dashboard():
     ])
 
     # Handle sidebar selection
-    if selected != "Dashboard" and selected in CATEGORIES:
-        st.session_state.selected_category = selected
-        st.session_state.view = "category"
-        st.session_state.selected_module = None
-    elif selected == "Dashboard":
-        st.session_state.view = "main"
-        st.session_state.selected_category = None
-        st.session_state.selected_module = None
+    if selected != st.session_state.last_sidebar:
+        st.session_state.last_sidebar = selected
+        if selected != "Dashboard" and selected in CATEGORIES:
+            st.session_state.selected_category = selected
+            st.session_state.view = "category"
+            st.session_state.selected_module = None
+        elif selected == "Dashboard":
+            st.session_state.view = "main"
+            st.session_state.selected_category = None
+            st.session_state.selected_module = None
 
     # ROUTER
     if st.session_state.view == "category":
@@ -366,9 +372,24 @@ def show_module_detail():
     st.markdown(f"# {name}")
     st.markdown(f"*{desc}*")
     
+
+
+    # SPECIAL ROUTING FOR FEVER MODULE (B2)
+    if code == "B2":
+        # let the module control its own tabs and UI
+        render_patient_module()
+        return
+    
     # Tabs
-    tab = st.radio("", ["🏠 Home", "🔗 ER Diagram", "📋 Tables", "🔍 SQL Query", "⚡ Triggers", "📊 Output"], horizontal=True)
+    tab = st.radio(
+        "Navigation",
+        ["🏠 Home", "🔗 ER Diagram", "📋 Tables", "🔍 SQL Query", "⚡ Triggers", "📊 Output"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
     st.divider()
+    
+
     
     if tab == "🏠 Home":
         st.info(f"**{name}** - {desc}")
@@ -431,18 +452,21 @@ END;
 """, language="sql")
     
     elif tab == "📊 Output":
+
         st.markdown("### Module Output")
+
+           
         st.success("✅ Patient Registered Successfully")
         st.info("📋 Patient ID: PT-2024-001234")
         st.info("📅 Registration Date: January 08, 2026")
-        
+            
         st.markdown("#### Generated Records")
         st.json({
-            "patient_id": "PT-2024-001234",
-            "name": "John Doe",
-            "age": 45,
-            "admission_date": "2026-01-08",
-            "status": "active"
+                "patient_id": "PT-2024-001234",
+                "name": "John Doe",
+                "age": 45,
+                "admission_date": "2026-01-08",
+                "status": "active"
         })
     
     st.divider()

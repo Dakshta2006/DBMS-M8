@@ -1,8 +1,8 @@
 # dashboards/admin_dashboard.py
 import streamlit as st
+import matplotlib.pyplot as plt
 from components.sidebar import sidebar
 from components.charts import patient_line_chart, appointment_donut_chart
-
 def admin_dashboard():
     # ---------- Session Defaults ----------
     st.session_state.setdefault("view", "dashboard")
@@ -127,7 +127,6 @@ def admin_dashboard():
     with col7:
         st.markdown("### Overall Appointments")
         # Simple bar chart for hourly appointments
-        import matplotlib.pyplot as plt
         hours = ["8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
         appointments = [12, 8, 15, 18, 6, 10, 16, 8, 15, 10, 17]
         

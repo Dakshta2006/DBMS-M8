@@ -10,4 +10,4 @@ def signup_page():
 
     if st.button("Create Account"):
         st.session_state.page = "login"
-        st.experimental_rerun()
+        st.rerun()

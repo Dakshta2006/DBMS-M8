@@ -3,7 +3,6 @@ import streamlit as st
 from components.sidebar import sidebar
 from components.charts import patient_line_chart, appointment_donut_chart
 import matplotlib.pyplot as plt
-
 # All categories and their modules
 CATEGORIES = {
     "A - Patient Clinical Data": {
@@ -353,6 +352,7 @@ def show_category_view():
 
 def show_module_detail():
     code, name, desc, tables, records = st.session_state.selected_module
+    
     cat_key = st.session_state.selected_category
     
     # Breadcrumb
