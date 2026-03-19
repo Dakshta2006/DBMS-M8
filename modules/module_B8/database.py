@@ -54,89 +54,74 @@ async def seed_fuo_guidance() -> None:
 
 
 # ─────────────────────────────────────────────
-# Seed: P(Symptom | Disease) — associated_symptoms collection
-# Each doc: { disease, symptom, sensitivity }
-# sensitivity = P(symptom present | patient has disease)
-# ─────────────────────────────────────────────
-ASSOCIATED_SYMPTOMS_SEED = [
-    # ── Typhoid Fever ──
-    {"disease": "Typhoid Fever",        "symptom": "headache",         "sensitivity": 0.80},
-    {"disease": "Typhoid Fever",        "symptom": "abdominal pain",   "sensitivity": 0.75},
-    {"disease": "Typhoid Fever",        "symptom": "constipation",     "sensitivity": 0.60},
-    {"disease": "Typhoid Fever",        "symptom": "diarrhea",         "sensitivity": 0.45},
-    {"disease": "Typhoid Fever",        "symptom": "rose spots",       "sensitivity": 0.30},
-    {"disease": "Typhoid Fever",        "symptom": "rigors",           "sensitivity": 0.50},
-    {"disease": "Typhoid Fever",        "symptom": "fatigue",          "sensitivity": 0.85},
-    # ── Malaria ──
-    {"disease": "Malaria",              "symptom": "rigors",           "sensitivity": 0.92},
-    {"disease": "Malaria",              "symptom": "sweating",         "sensitivity": 0.90},
-    {"disease": "Malaria",              "symptom": "headache",         "sensitivity": 0.85},
-    {"disease": "Malaria",              "symptom": "myalgia",          "sensitivity": 0.78},
-    {"disease": "Malaria",              "symptom": "nausea",           "sensitivity": 0.70},
-    {"disease": "Malaria",              "symptom": "vomiting",         "sensitivity": 0.65},
-    {"disease": "Malaria",              "symptom": "fatigue",          "sensitivity": 0.88},
-    {"disease": "Malaria",              "symptom": "splenomegaly",     "sensitivity": 0.60},
-    # ── Dengue ──
-    {"disease": "Dengue Fever",         "symptom": "headache",         "sensitivity": 0.90},
-    {"disease": "Dengue Fever",         "symptom": "retro-orbital pain","sensitivity": 0.75},
-    {"disease": "Dengue Fever",         "symptom": "myalgia",          "sensitivity": 0.88},
-    {"disease": "Dengue Fever",         "symptom": "rash",             "sensitivity": 0.65},
-    {"disease": "Dengue Fever",         "symptom": "nausea",           "sensitivity": 0.70},
-    {"disease": "Dengue Fever",         "symptom": "vomiting",         "sensitivity": 0.60},
-    {"disease": "Dengue Fever",         "symptom": "joint pain",       "sensitivity": 0.72},
-    {"disease": "Dengue Fever",         "symptom": "bleeding gums",    "sensitivity": 0.35},
-    # ── Tuberculosis ──
-    {"disease": "Tuberculosis",         "symptom": "night sweats",     "sensitivity": 0.85},
-    {"disease": "Tuberculosis",         "symptom": "weight loss",      "sensitivity": 0.88},
-    {"disease": "Tuberculosis",         "symptom": "cough",            "sensitivity": 0.90},
-    {"disease": "Tuberculosis",         "symptom": "haemoptysis",      "sensitivity": 0.40},
-    {"disease": "Tuberculosis",         "symptom": "fatigue",          "sensitivity": 0.82},
-    {"disease": "Tuberculosis",         "symptom": "chest pain",       "sensitivity": 0.45},
-    # ── Infective Endocarditis ──
-    {"disease": "Infective Endocarditis","symptom": "rigors",          "sensitivity": 0.70},
-    {"disease": "Infective Endocarditis","symptom": "joint pain",      "sensitivity": 0.55},
-    {"disease": "Infective Endocarditis","symptom": "sweating",        "sensitivity": 0.65},
-    {"disease": "Infective Endocarditis","symptom": "fatigue",         "sensitivity": 0.80},
-    {"disease": "Infective Endocarditis","symptom": "chest pain",      "sensitivity": 0.40},
-    {"disease": "Infective Endocarditis","symptom": "splinter haemorrhage","sensitivity": 0.25},
-    # ── Viral URI / Flu ──
-    {"disease": "Influenza",            "symptom": "headache",         "sensitivity": 0.80},
-    {"disease": "Influenza",            "symptom": "myalgia",          "sensitivity": 0.90},
-    {"disease": "Influenza",            "symptom": "cough",            "sensitivity": 0.85},
-    {"disease": "Influenza",            "symptom": "rigors",           "sensitivity": 0.65},
-    {"disease": "Influenza",            "symptom": "fatigue",          "sensitivity": 0.90},
-    {"disease": "Influenza",            "symptom": "nausea",           "sensitivity": 0.55},
-    {"disease": "Influenza",            "symptom": "sore throat",      "sensitivity": 0.70},
-    # ── UTI / Pyelonephritis ──
-    {"disease": "Pyelonephritis",       "symptom": "rigors",           "sensitivity": 0.75},
-    {"disease": "Pyelonephritis",       "symptom": "flank pain",       "sensitivity": 0.88},
-    {"disease": "Pyelonephritis",       "symptom": "nausea",           "sensitivity": 0.70},
-    {"disease": "Pyelonephritis",       "symptom": "vomiting",         "sensitivity": 0.60},
-    {"disease": "Pyelonephritis",       "symptom": "dysuria",          "sensitivity": 0.65},
-    {"disease": "Pyelonephritis",       "symptom": "fatigue",          "sensitivity": 0.72},
-    # ── Lymphoma ──
-    {"disease": "Lymphoma",             "symptom": "night sweats",     "sensitivity": 0.80},
-    {"disease": "Lymphoma",             "symptom": "weight loss",      "sensitivity": 0.82},
-    {"disease": "Lymphoma",             "symptom": "fatigue",          "sensitivity": 0.85},
-    {"disease": "Lymphoma",             "symptom": "itching",          "sensitivity": 0.45},
-    {"disease": "Lymphoma",             "symptom": "lymph node swelling","sensitivity": 0.88},
-]
-
-# ─────────────────────────────────────────────
-# Seed: P(Disease) — base prevalence priors
-# base_prevalence = rough estimated population prior (used in Bayesian denominator)
+# Seed: P(Disease) — Base Prevalence Priors
+# Grounded in tropical/Indian clinical epidemiology for Acute Febrile Illness
+# Total sums to 1.0 (100%) for perfect Bayesian math
 # ─────────────────────────────────────────────
 DIFFERENTIAL_DIAGNOSES_SEED = [
-    {"disease": "Typhoid Fever",          "base_prevalence": 0.12},
-    {"disease": "Malaria",                "base_prevalence": 0.18},
-    {"disease": "Dengue Fever",           "base_prevalence": 0.16},
-    {"disease": "Tuberculosis",           "base_prevalence": 0.10},
-    {"disease": "Infective Endocarditis", "base_prevalence": 0.04},
-    {"disease": "Influenza",              "base_prevalence": 0.22},
-    {"disease": "Pyelonephritis",         "base_prevalence": 0.10},
-    {"disease": "Lymphoma",               "base_prevalence": 0.08},
+    {"disease": "Viral Influenza",       "base_prevalence": 0.45}, 
+    {"disease": "Dengue Fever",          "base_prevalence": 0.20}, 
+    {"disease": "Malaria",               "base_prevalence": 0.15}, 
+    {"disease": "Typhoid Fever",         "base_prevalence": 0.10}, 
+    {"disease": "Tuberculosis",          "base_prevalence": 0.05},
+    {"disease": "Pyelonephritis (UTI)",  "base_prevalence": 0.05}, 
 ]
 
+# ─────────────────────────────────────────────
+# Seed: P(Symptom | Disease) — Likelihoods / Sensitivities
+# Data sourced from CDC Clinical Features, WHO Guidelines, and NIH StatPearls
+# ─────────────────────────────────────────────
+ASSOCIATED_SYMPTOMS_SEED = [
+    # ── Dengue Fever (Source: CDC) ──
+    {"disease": "Dengue Fever",          "symptom": "fever",              "sensitivity": 0.99},
+    {"disease": "Dengue Fever",          "symptom": "myalgia",            "sensitivity": 0.85}, 
+    {"disease": "Dengue Fever",          "symptom": "headache",           "sensitivity": 0.90},
+    {"disease": "Dengue Fever",          "symptom": "joint pain",         "sensitivity": 0.75}, 
+    {"disease": "Dengue Fever",          "symptom": "retro-orbital pain", "sensitivity": 0.60}, 
+    {"disease": "Dengue Fever",          "symptom": "rash",               "sensitivity": 0.50}, 
+    {"disease": "Dengue Fever",          "symptom": "nausea",             "sensitivity": 0.60},
+    {"disease": "Dengue Fever",          "symptom": "bleeding gums",      "sensitivity": 0.10}, 
+
+    # ── Malaria (Source: WHO) ──
+    {"disease": "Malaria",               "symptom": "fever",              "sensitivity": 0.99},
+    {"disease": "Malaria",               "symptom": "rigors",             "sensitivity": 0.85},
+    {"disease": "Malaria",               "symptom": "sweating",           "sensitivity": 0.70}, 
+    {"disease": "Malaria",               "symptom": "headache",           "sensitivity": 0.75},
+    {"disease": "Malaria",               "symptom": "fatigue",            "sensitivity": 0.90},
+    {"disease": "Malaria",               "symptom": "nausea",             "sensitivity": 0.60},
+
+    # ── Typhoid Fever / Enteric (Source: NIH StatPearls) ──
+    {"disease": "Typhoid Fever",         "symptom": "fever",              "sensitivity": 0.99}, 
+    {"disease": "Typhoid Fever",         "symptom": "abdominal pain",     "sensitivity": 0.62},
+    {"disease": "Typhoid Fever",         "symptom": "headache",           "sensitivity": 0.70},
+    {"disease": "Typhoid Fever",         "symptom": "diarrhea",           "sensitivity": 0.40},
+    {"disease": "Typhoid Fever",         "symptom": "constipation",       "sensitivity": 0.35},
+    {"disease": "Typhoid Fever",         "symptom": "rose spots",         "sensitivity": 0.20}, 
+    {"disease": "Typhoid Fever",         "symptom": "fatigue",            "sensitivity": 0.80},
+
+    # ── Viral Influenza (Source: CDC) ──
+    {"disease": "Viral Influenza",       "symptom": "fever",              "sensitivity": 0.95},
+    {"disease": "Viral Influenza",       "symptom": "cough",              "sensitivity": 0.85},
+    {"disease": "Viral Influenza",       "symptom": "myalgia",            "sensitivity": 0.80},
+    {"disease": "Viral Influenza",       "symptom": "headache",           "sensitivity": 0.80},
+    {"disease": "Viral Influenza",       "symptom": "sore throat",        "sensitivity": 0.70},
+    {"disease": "Viral Influenza",       "symptom": "fatigue",            "sensitivity": 0.85},
+
+    # ── Tuberculosis (Source: WHO) ──
+    {"disease": "Tuberculosis",          "symptom": "cough",              "sensitivity": 0.90}, 
+    {"disease": "Tuberculosis",          "symptom": "fever",              "sensitivity": 0.85}, 
+    {"disease": "Tuberculosis",          "symptom": "weight loss",        "sensitivity": 0.88},
+    {"disease": "Tuberculosis",          "symptom": "night sweats",       "sensitivity": 0.85},
+    {"disease": "Tuberculosis",          "symptom": "haemoptysis",        "sensitivity": 0.40}, 
+    {"disease": "Tuberculosis",          "symptom": "fatigue",            "sensitivity": 0.82},
+
+    # ── Pyelonephritis / Severe UTI (Source: NIH) ──
+    {"disease": "Pyelonephritis (UTI)",  "symptom": "fever",              "sensitivity": 0.90},
+    {"disease": "Pyelonephritis (UTI)",  "symptom": "flank pain",         "sensitivity": 0.88}, 
+    {"disease": "Pyelonephritis (UTI)",  "symptom": "dysuria",            "sensitivity": 0.75}, 
+    {"disease": "Pyelonephritis (UTI)",  "symptom": "rigors",             "sensitivity": 0.70},
+    {"disease": "Pyelonephritis (UTI)",  "symptom": "nausea",             "sensitivity": 0.65},
+]
 
 async def seed_bayesian_data() -> None:
     """Seed associated_symptoms and differential_diagnoses if empty."""
