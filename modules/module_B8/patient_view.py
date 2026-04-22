@@ -1,10 +1,115 @@
 # modules/module_B8/patient_view.py
-import streamlit as st
-import pandas as pd
-import requests
+import asyncio
+import os
 from datetime import datetime
 
-API_BASE_URL = "http://localhost:8000/api/b8"
+import pandas as pd
+import requests
+import streamlit as st
+from fastapi.encoders import jsonable_encoder
+
+from modules.module_B8.database import (
+    fetch_patient_episodes,
+    fetch_pattern_analytics,
+    run_sql_demo,
+    seed_all_collections,
+)
+from modules.module_B8.schemas import FeverEpisodeCreate
+from modules.module_B8.services import process_and_save_episode
+
+
+def _resolve_api_base_url() -> str:
+    """
+    Optional external backend URL.
+    Priority:
+      1) Streamlit secrets: FASTAPI_BACKEND_URL / API_BASE_URL
+      2) Environment:      FASTAPI_BACKEND_URL / API_BASE_URL
+    """
+    for key in ("FASTAPI_BACKEND_URL", "API_BASE_URL"):
+        try:
+            if key in st.secrets and st.secrets[key]:
+                return str(st.secrets[key]).rstrip("/")
+        except Exception:
+            # st.secrets can be unavailable in local dev if no secrets file exists
+            pass
+
+        value = os.getenv(key)
+        if value:
+            return value.rstrip("/")
+
+    return ""
+
+
+API_BASE_URL = _resolve_api_base_url()
+USE_HTTP_BACKEND = bool(API_BASE_URL)
+
+
+def _run_async(coro):
+    """Run async DB/service calls from Streamlit's sync execution flow."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+@st.cache_resource(show_spinner=False)
+def _init_local_backend() -> bool:
+    """Seed required collections once per app process in direct mode."""
+    _run_async(seed_all_collections())
+    return True
+
+
+def _create_episode(payload: dict) -> dict:
+    if USE_HTTP_BACKEND:
+        resp = requests.post(f"{API_BASE_URL}/episodes", json=payload, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+
+    _init_local_backend()
+    model = FeverEpisodeCreate(**payload)
+    data = _run_async(process_and_save_episode(model))
+    return jsonable_encoder(data)
+
+
+def _get_patient_episodes(patient_id: str):
+    if USE_HTTP_BACKEND:
+        resp = requests.get(f"{API_BASE_URL}/episodes/{patient_id}", timeout=15)
+        resp.raise_for_status()
+        return resp.json()
+
+    _init_local_backend()
+    data = _run_async(fetch_patient_episodes(patient_id))
+    return jsonable_encoder(data)
+
+
+def _get_pattern_analytics():
+    if USE_HTTP_BACKEND:
+        resp = requests.get(f"{API_BASE_URL}/analytics/patterns", timeout=15)
+        resp.raise_for_status()
+        return resp.json()
+
+    _init_local_backend()
+    data = _run_async(fetch_pattern_analytics())
+    return jsonable_encoder(data)
+
+
+def _run_sql_demo(query_name: str) -> dict:
+    if USE_HTTP_BACKEND:
+        resp = requests.get(f"{API_BASE_URL}/sql-demo/{query_name}", timeout=20)
+        resp.raise_for_status()
+        return resp.json()
+
+    _init_local_backend()
+    data = _run_async(run_sql_demo(query_name))
+    if data is None:
+        raise ValueError(f"Unknown demo query: {query_name}")
+    return jsonable_encoder(data)
 
 # ─────────────────────────────────────────────
 # Helpers
@@ -54,6 +159,9 @@ def _urgency_color(level: str) -> str:
 # ─────────────────────────────────────────────
 
 def render_patient_module():
+    mode = "External FastAPI" if USE_HTTP_BACKEND else "Direct (in-process backend)"
+    st.caption(f"Backend mode: {mode}")
+
     tabs = st.tabs([
         "🏠 Fever Triage Input",
         "📤 My Episodes",
@@ -189,9 +297,7 @@ def _triage_input_tab():
 
     try:
         with st.spinner("Saving episode → running DB aggregation → Bayesian engine..."):
-            resp = requests.post(f"{API_BASE_URL}/episodes", json=payload, timeout=30)
-            resp.raise_for_status()
-            data = resp.json()
+            data = _create_episode(payload)
 
         st.success(f"✅ Evaluation complete — episode saved (ID: `{data['episode_id']}`)")
 
@@ -250,8 +356,9 @@ def _triage_input_tab():
 
     except requests.exceptions.ConnectionError:
         st.error(
-            "❌ Cannot connect to FastAPI backend. Start it with:\n"
-            "```\nvenv\\Scripts\\uvicorn backend.main:app --reload\n```"
+            "❌ Cannot connect to the configured FastAPI backend URL. "
+            "Set `FASTAPI_BACKEND_URL` (or `API_BASE_URL`) in Streamlit secrets "
+            "to your deployed API endpoint."
         )
     except requests.exceptions.HTTPError as e:
         st.error(f"❌ API returned an error: {e.response.text}")
@@ -389,9 +496,7 @@ def _my_episodes_tab():
         if not patient_id:
             return
         try:
-            resp = requests.get(f"{API_BASE_URL}/episodes/{patient_id}", timeout=15)
-            resp.raise_for_status()
-            episodes = resp.json()
+            episodes = _get_patient_episodes(patient_id)
 
             if not episodes:
                 st.info(f"No episodes found for patient {patient_id}.")
@@ -428,9 +533,7 @@ def _analytics_tab():
     st.header("Global Pattern Analytics")
     st.caption("Aggregates data from the `fever_episodes` collection.")
     try:
-        resp = requests.get(f"{API_BASE_URL}/analytics/patterns", timeout=15)
-        resp.raise_for_status()
-        stats = resp.json()
+        stats = _get_pattern_analytics()
 
         if stats:
             df = pd.DataFrame(stats)
@@ -439,15 +542,12 @@ def _analytics_tab():
         else:
             st.info("No analytics available yet. Submit an episode first!")
     except Exception as e:
-        st.error("Ensure the backend API is running to fetch analytics.")
+        st.error(f"Failed to fetch analytics. {e}")
 
 
 # ─────────────────────────────────────────────
 # Tab 4 – ER Diagram
 # ─────────────────────────────────────────────
-
-import os
-import streamlit as st
 
 def _er_tab():
     st.header("Entity-Relationship Diagram")
@@ -668,9 +768,7 @@ Each button shows the pipeline definition alongside its **SQL equivalent**, then
             if run_it:
                 with st.spinner(f"Running `{query_name}` aggregation pipeline..."):
                     try:
-                        resp = requests.get(f"{API_BASE_URL}/sql-demo/{query_name}", timeout=20)
-                        resp.raise_for_status()
-                        data = resp.json()
+                        data = _run_sql_demo(query_name)
 
                         st.success(f"✅ `{query_name}` executed — {len(data['results'])} documents returned.")
 
@@ -690,7 +788,10 @@ Each button shows the pipeline definition alongside its **SQL equivalent**, then
                             st.info("No data in the collection yet — submit a fever episode first.")
 
                     except requests.exceptions.ConnectionError:
-                        st.error("❌ Cannot reach FastAPI. Start it with:\n```\nvenv\\Scripts\\uvicorn backend.main:app --reload\n```")
+                        st.error(
+                            "❌ Cannot connect to the configured FastAPI backend URL. "
+                            "Set `FASTAPI_BACKEND_URL` (or `API_BASE_URL`) in Streamlit secrets."
+                        )
                     except Exception as e:
                         st.error(f"Error: {e}")
 

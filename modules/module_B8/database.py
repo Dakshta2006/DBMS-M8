@@ -8,14 +8,37 @@
 import motor.motor_asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import os
 
 # ─────────────────────────────────────────────
 # Connection (Atlas)
 # ─────────────────────────────────────────────
-MONGO_DETAILS = (
-    "mongodb+srv://24je0608_db_user:*******"
-    "@cluster0.n7xgc4b.mongodb.net/?appName=Cluster0"
-)
+def _resolve_mongo_details() -> str:
+    """Resolve MongoDB URI from env or Streamlit secrets."""
+    env_keys = ("MONGO_DETAILS", "MONGODB_URI", "MONGO_URI")
+
+    for key in env_keys:
+        value = os.getenv(key)
+        if value:
+            return value
+
+    try:
+        import streamlit as st
+
+        for key in env_keys:
+            if key in st.secrets and st.secrets[key]:
+                return str(st.secrets[key])
+    except Exception:
+        # Streamlit secrets are unavailable in non-Streamlit runtime.
+        pass
+
+    raise RuntimeError(
+        "MongoDB URI not configured. Set MONGO_DETAILS (or MONGODB_URI/MONGO_URI) "
+        "in environment variables or Streamlit secrets."
+    )
+
+
+MONGO_DETAILS = _resolve_mongo_details()
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_DETAILS)
 db = client["MedicalCopilotDB"]
 
