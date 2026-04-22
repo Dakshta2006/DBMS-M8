@@ -8,6 +8,12 @@ import requests
 import streamlit as st
 from fastapi.encoders import jsonable_encoder
 
+try:
+    import nest_asyncio
+    nest_asyncio.apply()
+except ImportError:
+    pass  # Not critical if not installed
+
 from modules.module_B8.database import (
     fetch_patient_episodes,
     fetch_pattern_analytics,
@@ -47,15 +53,12 @@ USE_HTTP_BACKEND = bool(API_BASE_URL)
 def _run_async(coro):
     """Run async DB/service calls from Streamlit's sync execution flow."""
     try:
-        asyncio.get_running_loop()
+        loop = asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(coro)
-
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(coro)
 
 
 @st.cache_resource(show_spinner=False)
