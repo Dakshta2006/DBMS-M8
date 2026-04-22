@@ -2,17 +2,12 @@
 import asyncio
 import os
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 import requests
 import streamlit as st
 from fastapi.encoders import jsonable_encoder
-
-try:
-    import nest_asyncio
-    nest_asyncio.apply()
-except ImportError:
-    pass  # Not critical if not installed
 
 from modules.module_B8.database import (
     fetch_patient_episodes,
@@ -22,6 +17,9 @@ from modules.module_B8.database import (
 )
 from modules.module_B8.schemas import FeverEpisodeCreate
 from modules.module_B8.services import process_and_save_episode
+
+# Thread pool for running async tasks without event loop conflicts
+_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def _resolve_api_base_url() -> str:
@@ -51,14 +49,17 @@ USE_HTTP_BACKEND = bool(API_BASE_URL)
 
 
 def _run_async(coro):
-    """Run async DB/service calls from Streamlit's sync execution flow."""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
+    """Run async coroutine in a separate thread with its own event loop."""
+    def _run_in_thread():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
     
-    return loop.run_until_complete(coro)
+    future = _executor.submit(_run_in_thread)
+    return future.result()
 
 
 @st.cache_resource(show_spinner=False)

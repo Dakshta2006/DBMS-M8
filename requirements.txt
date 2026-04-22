@@ -3,7 +3,6 @@ streamlit
 streamlit-option-menu
 fastapi
 uvicorn
-nest-asyncio
 
 # Database
 motor
