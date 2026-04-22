@@ -1,8 +1,8 @@
 # modules/module_B8/patient_view.py
 import asyncio
 import os
+import threading
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 import requests
@@ -17,10 +17,6 @@ from modules.module_B8.database import (
 )
 from modules.module_B8.schemas import FeverEpisodeCreate
 from modules.module_B8.services import process_and_save_episode
-
-# Thread pool for running async tasks without event loop conflicts
-_executor = ThreadPoolExecutor(max_workers=1)
-
 
 def _resolve_api_base_url() -> str:
     """
@@ -48,17 +44,21 @@ API_BASE_URL = _resolve_api_base_url()
 USE_HTTP_BACKEND = bool(API_BASE_URL)
 
 
-def _run_async(coro):
-    """Run async coroutine in a separate thread with its own event loop."""
-    def _run_in_thread():
-        loop = asyncio.new_event_loop()
+@st.cache_resource
+def _get_bg_loop():
+    """Create a persistent background event loop for Motor."""
+    loop = asyncio.new_event_loop()
+    def _run_loop():
         asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(coro)
-        finally:
-            loop.close()
-    
-    future = _executor.submit(_run_in_thread)
+        loop.run_forever()
+    t = threading.Thread(target=_run_loop, daemon=True)
+    t.start()
+    return loop
+
+def _run_async(coro):
+    """Run coroutine in the persistent background event loop."""
+    loop = _get_bg_loop()
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
     return future.result()
 
 
