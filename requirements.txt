@@ -1,10 +1,15 @@
+# Web Frameworks
 streamlit
 streamlit-option-menu
-matplotlib
 fastapi
-motor
-pandas
 uvicorn
+
+# Database
+motor
 pymongo
-bson
+dnspython
+
+# Data & Utilities
+pandas
+matplotlib
 python-multipart
